@@ -1,0 +1,36 @@
+{
+  "name": "structure",
+  "version": "1.0.0",
+  "description": "This is an Angular client for Behaviours.",
+  "main": "gulpfile.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/quaNode/Behaviours-AngularJS-Client.git"
+  },
+  "author": "Mohamed Faesal Ahmed",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/quaNode/Behaviours-AngularJS-Client/issues"
+  },
+  "homepage": "https://github.com/quaNode/Behaviours-AngularJS-Client",
+  "devDependencies": {
+    "angular-mocks": "~1.4.7",
+    "gulp": "^3.9.1",
+    "jasmine-core": "^2.4.1",
+    "karma": "^0.13.21",
+    "karma-chrome-launcher": "^0.2.2",
+    "karma-jasmine": "^0.3.7",
+    "karma-phantomjs-launcher": "^1.0.0",
+    "phantomjs-prebuilt": "^2.1.4"
+  },
+  "dependencies": {
+    "angular": "^1.5.0",
+    "angular-route": "~1.4.7"
+  }
+}
