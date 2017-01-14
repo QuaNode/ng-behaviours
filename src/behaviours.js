@@ -2,10 +2,10 @@ var app = angular.module("behaviour", []);
 var behaviour = app.factory('behaviours', ['$http', function($http) {
 
 
-	var BehavioursJson = null;
+	var behavioursJson = null;
 	$http.get('/data').then(function(response) {
 
-		BehavioursJson = response.data;
+		behavioursJson = response.data;
 	}, function(error) {
 
 		throw new Error('Error in initializing Behaviours' + error.message);
@@ -14,10 +14,10 @@ var behaviour = app.factory('behaviours', ['$http', function($http) {
 
 		getBehaviour: function(behaviourName) {
 
-			while (!BehavioursJson);
-			if (BehavioursJson[behaviourName]) {
+			while (!behavioursJson);
+			if (behavioursJson[behaviourName]) {
 
-				var behaviour = BehavioursJson[behaviourName];
+				var behaviour = behavioursJson[behaviourName];
 				return function(behaviourData, callback) {
 
 					var keys = Object.keys(behaviourData);
@@ -30,7 +30,7 @@ var behaviour = app.factory('behaviours', ['$http', function($http) {
 						switch (type) {
 
 							case 'header':
-								headers[behaviour.parameters[keys[key]].key.split('.')[1]] = behaviourData[keys[key]];
+								headers[behaviour.parameters[keys[key]].key] = behaviourData[keys[key]];
 								break;
 							case 'body':
 								var paths = behaviour.parameters[keys[key]].key.split('.');
