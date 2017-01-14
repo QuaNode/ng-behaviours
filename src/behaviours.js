@@ -6,6 +6,17 @@ var behaviour = app.factory('behaviours', ['$http', function($http) {
 	$http.get('/data').then(function(response) {
 
 		behavioursJson = response.data;
+		if (typeof behavioursJson === 'object') {
+
+        		var keys = Object.keys(behavioursJson);
+       	 		for (var i = 0; i < keys.length; i++) {
+				
+		       		self[keys[i]] = self.getBehaviour(keys[i]);
+        		}
+      		} else {
+
+        		throw new Error('Error in initializing Behaviours');
+      		}
 	}, function(error) {
 
 		throw new Error('Error in initializing Behaviours' + error.message);
