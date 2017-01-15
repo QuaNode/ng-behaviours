@@ -6,20 +6,29 @@ var behaviour = app.factory('behaviours', ['$http', function($http) {
 	var self = {
 
 		getBehaviour: function(behaviourName) {
+			
+			if (typeof behaviourName !== 'string') {
 
+        			throw new Error('Invalid behaviour name');
+      			}
 			while (!behavioursJson);
 			if (behavioursJson[behaviourName]) {
 
 				var behaviour = behavioursJson[behaviourName];
 				return function(behaviourData, callback) {
+					
+					if (typeof behaviourData !== 'object') {
 
+           					throw new Error(behaviourName + ' behaviour parameters should be an object');
+         	 			}
 					var keys = Object.keys(behaviourData);
 					var headers = {};
 					var data = {};
 					var url = behaviour.path;
 					var type = null;
 					for (var key in keys) {
-						type = typeof behaviour.parameters[keys[key]] === 'object' ? behaviour.parameters[keys[key]].type : '';
+						
+						var type = behaviour.parameters && typeof behaviour.parameters[keys[key]] === 'object' ? behaviour.parameters[keys[key]].type : '';
 						switch (type) {
 
 							case 'header':
