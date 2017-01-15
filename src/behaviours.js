@@ -19,7 +19,7 @@ var behaviour = app.factory('behaviours', ['$http', function($http) {
 					var url = behaviour.path;
 					var type = null;
 					for (var key in keys) {
-						type = behaviour.parameters[keys[key]].type;
+						type = typeof behaviour.parameters[keys[key]] === 'object' ? behaviour.parameters[keys[key]].type : '';
 						switch (type) {
 
 							case 'header':
