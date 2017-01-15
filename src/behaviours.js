@@ -1,5 +1,5 @@
 var app = angular.module("behaviour", []);
-var behaviour = app.factory('behaviours', ['$http', function($http) {
+var behaviour = app.factory('behaviours', ['$http', function($http, baseURL) {
 
 
 	var behavioursJson = null;
@@ -11,7 +11,10 @@ var behaviour = app.factory('behaviours', ['$http', function($http) {
 
         			throw new Error('Invalid behaviour name');
       			}
-			while (!behavioursJson);
+			if (!behavioursJson) {
+
+        			throw new Error('Behaviours is not ready yet');
+     			}
 			if (behavioursJson[behaviourName]) {
 
 				var behaviour = behavioursJson[behaviourName];
@@ -77,7 +80,8 @@ var behaviour = app.factory('behaviours', ['$http', function($http) {
 			}
 			return null;
 		}
-	$http.get('/data').then(function(response) {
+	$http.get((typeof baseURL === 'string' && baseURL.length > 0 ? typeof baseURL.split('/')[0] === 'string' &&
+      baseURL.split('/')[0].startsWith('http') ? baseURL : window.location.origin + baseURL : '') + '/behaviours').then(function(response) {
 
 		behavioursJson = response.data;
 		if (typeof behavioursJson === 'object') {
