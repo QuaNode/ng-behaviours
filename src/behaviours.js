@@ -2,7 +2,7 @@ var app = angular.module("behaviour", []);
 var behaviour = app.factory('behaviours', ['$http', function($http, baseURL, defaults) {
 
 	var behavioursJson = null;
-	var parameters = Object.assign(JSON.parse(window[parameter.source].getItem('Behaviours') || '{}'), defaults || {});
+	var parameters = Object.assign(JSON.parse(window.localStorage.getItem('Behaviours') || '{}'), defaults || {});
 	var getValueForParameter = function(parameter, data, key, name) {
 
 		return data[key] || (function() {
@@ -30,17 +30,16 @@ var behaviour = app.factory('behaviours', ['$http', function($http, baseURL, def
 				var behaviour = behavioursJson[behaviourName];
 				return function(behaviourData, callback) {
 
-					if (typeof behaviourData !== 'object') {
-
-						throw new Error(behaviourName + ' behaviour parameters should be an object');
-					}
-					var keys = Object.keys(behaviourData);
+					if (typeof behaviourData !== 'object') behaviourData = {};
+					var params = Object.assign(behaviour.parameters || {}, parameters);
+          var keys = Object.keys(params);
 					var headers = {};
 					var data = {};
 					var url = behaviour.path;
-					var params = Object.assign(parameters, behaviour.parameters || {});
 					for (var key in keys) {
 
+						if (Array.isArray(params[keys[key]].unless) && params[keys[key]].unless.indexOf(behaviourName) > -1) continue;
+						if (Array.isArray(params[keys[key]].for) && params[keys[key]].for.indexOf(behaviourName) === -1) continue;
 						var type = params && typeof params[keys[key]] === 'object' ? params[keys[key]].type : '';
 						switch (type) {
 
@@ -84,21 +83,41 @@ var behaviour = app.factory('behaviours', ['$http', function($http, baseURL, def
 						data = {};
 						if (typeof behaviour.returns === 'object' && Object.keys(behaviour.returns).filter(function(key) {
 
-								var value;
+								var paramValue, paramKey;
 								if (behaviour.returns[key].type === 'header')
-									headers[behaviour.returns[key].key || key] = value = response.headers(key);
-								if (behaviour.returns[key].type === 'body' && typeof response.data === 'object' && !data[key])
-									data[key] = value = Array.isArray(response.data) ? response.data : response.data[key];
-								if (behaviour.returns[key].default && value) {
+									headers[paramKey = behaviour.returns[key].key || key] = paramValue = response.headers.get(key);
+								if (behaviour.returns[key].type === 'body' && typeof response.json().response === 'object' && !data[key])
+									data[paramKey = key] = paramValue = Array.isArray(response.json().response) ? response.json().response : response.json().response[key];
+								if (behaviour.returns[key].purpose && paramValue && paramKey) {
 
-									var param = {};
-									param[behaviour.returns[key].key || key] = parameters[behaviour.returns[key].key || key] = {
+									if (!Array.isArray(behaviour.returns[key].purpose)) behaviour.returns[key].purpose = [behaviour.returns[key].purpose];
+									for (var index in behaviour.returns[key].purpose) {
 
-										key: key,
-										type: behaviour.returns[key].type,
-										source: 'localStorage'
-									};
-									window.localStorage.setItem('Behaviours', JSON.stringify(param));
+										var purpose = behaviour.returns[key].purpose[index];
+										switch (typeof purpose === 'object' ? purpose.as : purpose) {
+
+											case 'parameter':
+												var param = {};
+												param[paramKey] = parameters[paramKey] = {
+
+													key: key,
+													type: behaviour.returns[key].type
+												};
+												if (Array.isArray(purpose.unless)) param[paramKey].unless = parameters[paramKey].unless = purpose.unless;
+												if (Array.isArray(purpose.for)) param[paramKey].for = parameters[paramKey].for = purpose.for;
+												if (behaviour.returns[key].purpose.filter(function(p) {
+
+														return p === 'constant' || p.as === 'constant';
+													}).length > 0) param[paramKey].value = parameters[paramKey].value = paramValue;
+												else {
+
+													param[paramKey].source = parameters[paramKey].source = 'localStorage';
+													window.localStorage.setItem(paramKey, paramValue);
+												}
+												window.localStorage.setItem('Behaviours', JSON.stringify(param));
+												break;
+										}
+									}
 								}
 								return behaviour.returns[key].type === 'header';
 							}).length > 0) {

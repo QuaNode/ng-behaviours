@@ -1,6 +1,6 @@
 {
   "name": "ng-behaviours",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "This is an Angular client for Behaviours.",
   "main": "gulpfile.js",
   "directories": {
