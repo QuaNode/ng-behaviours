@@ -1,2 +1,2 @@
-# AngularJS client for Behaviours
+# ng-behaviours
 AngularJS client for Behaviours
