@@ -1,8 +1,7 @@
 {
     "name": "ng-behaviours",
-    "version": "1.3.0",
-    "description": "This is an Angular client for Behaviours.",
-    "main": "gulpfile.js",
+    "version": "1.3.1",
+    "description": "This is an AngularJS client for Behaviours.",
     "directories": {
         "test": "test"
     },
@@ -13,7 +12,7 @@
         "type": "git",
         "url": "git+https://github.com/quaNode/Behaviours-AngularJS-Client.git"
     },
-    "author": "Mohamed Faesal Ahmed",
+    "author": "QuaNode",
     "license": "ISC",
     "bugs": {
         "url": "https://github.com/quaNode/Behaviours-AngularJS-Client/issues"
