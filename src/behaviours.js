@@ -1,18 +1,21 @@
 /*jshint esversion: 6 */
 
 import {
-    Injectable,
-    Inject
+  Injectable,
+  Inject
 } from '@angular/core';
 import {
-    Http,
-    Request,
-    RequestMethod,
-    Headers
+  Http,
+  Request,
+  RequestMethod,
+  Headers
 } from '@angular/http';
 import {
-    Observable
+  Observable
 } from 'rxjs';
+import 'rxjs/add/observable/throw';
+import 'rxjs/add/operator/map';
+import 'rxjs/add/operator/catch';
 
 var getValueForParameter = function (parameter, data, key, name) {
 
