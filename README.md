@@ -1,5 +1,5 @@
 # ng-behaviours
-Angular 5 client for Behaviours
+Behaviours client Angular 5
 
 ```
 npm install ng-behaviours@^3.0.0
