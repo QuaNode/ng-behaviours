@@ -1,6 +1,6 @@
 {
     "name": "ng-behaviours",
-    "version": "2.0.0",
+    "version": "2.2.0",
     "description": "This is an Angular 2 client for Behaviours.",
     "repository": {
         "type": "git",
