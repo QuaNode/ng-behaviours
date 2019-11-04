@@ -14,27 +14,53 @@ import {
     Observable
 } from 'rxjs';
 
-var getValueForParameter = function (parameter, data, key, name) {
+var sourceStorage = {};
+
+var getValueForParameter = function(parameter, data, key, name) {
 
     if (typeof data === 'object' && typeof key === 'string' && data[key] !== undefined) return data[key];
-    else return (function () {
+    else return (function() {
 
         if (parameter.value) return typeof parameter.value === 'function' ? parameter.value(name, data) : parameter.value;
         else return getParamterFromCache(parameter.source, key)[key].value;
     }());
 };
 
-var getParamterFromCache = function (source, key) {
+var getParamterFromCache = function(source, key) {
 
-    if (typeof source === 'string' && typeof window[source] === 'object')
+    if (typeof source === 'string' && typeof window[source] === 'object') try {
+
         return JSON.parse(window[source].getItem('Behaviours') || (key ? '{"' + key + '":{}}' : '{}'));
-    return JSON.parse(key ? '{"' + key + '":{}}' : '{}');
+    } catch (e) {
+
+        console.log(e);
+    }
+    if (!window[source]) window[source] = {};
+    window[source].getItem = function(key) {
+
+        return sourceStorage[key];
+    };
+    return JSON.parse(window[source].getItem('Behaviours') || (key ? '{"' + key + '":{}}' : '{}'));
 };
 
-var setParameterToCache = function (parameters, key) {
+var setParameterToCache = function(parameters, key) {
 
-    if (typeof key === 'string' && typeof parameters[key].source === 'string' && typeof window[parameters[key].source] === 'object')
+    if (typeof key === 'string' && typeof parameters[key].source === 'string') {
+
+        if (typeof window[parameters[key].source] === 'object') try {
+
+            window[parameters[key].source].setItem('Behaviours', JSON.stringify(parameters));
+        } catch (e) {
+
+            console.log(e);
+        }
+        if (!window[parameters[key].source]) window[parameters[key].source] = {};
+        window[parameters[key].source].setItem = function(key, value) {
+
+            sourceStorage[key] = value;
+        };
         window[parameters[key].source].setItem('Behaviours', JSON.stringify(parameters));
+    }
 };
 
 export class Behaviours {
@@ -73,11 +99,11 @@ export class Behaviours {
 
             throw new Error('Error in initializing Behaviours: ' + error.json().message || error.statusText || ('Error status: ' + error.status));
         });
-        self.getBaseUrl = self.getBaseURL = function () {
+        self.getBaseUrl = self.getBaseURL = function() {
 
             return baseURL;
         };
-        self.ready = function (cb) {
+        self.ready = function(cb) {
 
             if (typeof cb !== 'function') return;
             if (!behavioursBody) {
@@ -85,7 +111,7 @@ export class Behaviours {
                 callbacks.push(cb);
             } else cb();
         };
-        self.getBehaviour = function (behaviourName) {
+        self.getBehaviour = function(behaviourName) {
 
             if (typeof behaviourName !== 'string') {
 
@@ -98,7 +124,7 @@ export class Behaviours {
             if (behavioursBody[behaviourName]) {
 
                 var behaviour = behavioursBody[behaviourName];
-                return function (behaviourData) {
+                return function(behaviourData) {
 
                     if (typeof behaviourData !== 'object') behaviourData = {};
                     var parameters = Object.assign(getParamterFromCache('localStorage'), defaults || {});
@@ -158,7 +184,7 @@ export class Behaviours {
 
                             headers = {};
                             data = {};
-                            if (typeof behaviour.returns === 'object' && Object.keys(behaviour.returns).filter(function (key) {
+                            if (typeof behaviour.returns === 'object' && Object.keys(behaviour.returns).filter(function(key) {
 
                                     var paramValue, paramKey;
                                     if (behaviour.returns[key].type === 'header')
@@ -182,7 +208,7 @@ export class Behaviours {
                                                     };
                                                     if (Array.isArray(purpose.unless)) param[paramKey].unless = parameters[paramKey].unless = purpose.unless;
                                                     if (Array.isArray(purpose.for)) param[paramKey].for = parameters[paramKey].for = purpose.for;
-                                                    if (behaviour.returns[key].purpose.filter(function (p) {
+                                                    if (behaviour.returns[key].purpose.filter(function(p) {
 
                                                             return p === 'constant' || p.as === 'constant';
                                                         }).length > 0) param[paramKey].value = parameters[paramKey].value = paramValue;
