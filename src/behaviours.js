@@ -49,7 +49,7 @@ var setParameterToCache = function(parameters, key) {
 
         if (typeof window[parameters[key].source] === 'object') try {
 
-            window[parameters[key].source].setItem('Behaviours', JSON.stringify(parameters));
+            return window[parameters[key].source].setItem('Behaviours', JSON.stringify(parameters));
         } catch (e) {
 
             console.log(e);
