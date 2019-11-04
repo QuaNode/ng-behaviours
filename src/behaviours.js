@@ -28,33 +28,40 @@ var getValueForParameter = function(parameter, data, key, name) {
 
 var getParamterFromCache = function(source, key) {
 
-    if (typeof source === 'string' && typeof window[source] === 'object') try {
+    var getItem = function() {
 
         return JSON.parse(window[source].getItem('Behaviours') || (key ? '{"' + key + '":{}}' : '{}'));
-    } catch (e) {
-
-        console.log(e);
-    }
-    if (!window[source]) window[source] = {};
-    window[source].getItem = function(key) {
-
-        return sourceStorage[key];
     };
-    return JSON.parse(window[source].getItem('Behaviours') || (key ? '{"' + key + '":{}}' : '{}'));
+    if (typeof source === 'string' && typeof window[source] === 'object') {
+
+        try {
+
+            return getItem();
+        } catch (e) {
+
+            console.log(e);
+        }
+        window[source].getItem = function(key) {
+
+            return sourceStorage[key];
+        };
+        return getItem();
+    }
+    return JSON.parse(key ? '{"' + key + '":{}}' : '{}');
 };
 
 var setParameterToCache = function(parameters, key) {
 
-    if (typeof key === 'string' && typeof parameters[key].source === 'string') {
+    if (typeof key === 'string' && typeof parameters[key].source === 'string' &&
+        typeof window[parameters[key].source] === 'object') {
 
-        if (typeof window[parameters[key].source] === 'object') try {
+        try {
 
             return window[parameters[key].source].setItem('Behaviours', JSON.stringify(parameters));
         } catch (e) {
 
             console.log(e);
         }
-        if (!window[parameters[key].source]) window[parameters[key].source] = {};
         window[parameters[key].source].setItem = function(key, value) {
 
             sourceStorage[key] = value;
