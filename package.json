@@ -1,6 +1,6 @@
 {
     "name": "ng-behaviours",
-    "version": "2.4.2",
+    "version": "2.4.3",
     "description": "This is an Angular 2 client for Behaviours.",
     "repository": {
         "type": "git",
@@ -12,9 +12,9 @@
         "url": "https://github.com/quaNode/Behaviours-AngularJS-Client/issues"
     },
     "homepage": "https://github.com/quaNode/Behaviours-AngularJS-Client",
-    "dependencies": {
-        "@angular/core": "^2.2.3",
-        "@angular/http": "^2.2.3",
-        "rxjs": "5.0.0-beta.12"
+    "peerDependencies": {
+        "@angular/core": "2.x",
+        "@angular/http": "2.x",
+        "rxjs": "5.x"
     }
 }
