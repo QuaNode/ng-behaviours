@@ -21,7 +21,8 @@ var getValueForParameter = function (parameter, data, key, name) {
     if (typeof data === 'object' && typeof key === 'string' && data[key] !== undefined) return data[key];
     else return (function () {
 
-        if (parameter.value) return typeof parameter.value === 'function' ? parameter.value(name, data) : parameter.value;
+        if (parameter.value) return typeof parameter.value === 'function' ? parameter.value(name, data) :
+            parameter.value;
         else return getParamterFromCache(parameter.source, key)[key].value;
     }());
 };
@@ -78,8 +79,10 @@ export class Behaviours {
         var behavioursBody = null;
         var behavioursHeaders = null;
         var callbacks = [];
-        if (!behavioursBody) http.get((typeof baseURL === 'string' && baseURL.length > 0 ? typeof baseURL.split('/')[0] === 'string' &&
-            baseURL.split('/')[0].startsWith('http') ? baseURL : window.location.origin + baseURL : '') + '/behaviours').subscribe((response) => {
+        if (!behavioursBody) http.get((typeof baseURL === 'string' && baseURL.length > 0 ?
+            typeof baseURL.split('/')[0] === 'string' && baseURL.split('/')[0].startsWith('http') ?
+                baseURL : window.location.origin + baseURL : '') +
+            '/behaviours').subscribe(function (response) {
 
                 behavioursBody = response.json();
                 behavioursHeaders = {
@@ -102,9 +105,10 @@ export class Behaviours {
 
                     throw new Error('Error in initializing Behaviours');
                 }
-            }, (error) => {
+            }, function (error) {
 
-                throw new Error('Error in initializing Behaviours: ' + error.json().message || error.statusText || ('Error status: ' + error.status));
+                throw new Error('Error in initializing Behaviours: ' + error.json().message ||
+                    error.statusText || ('Error status: ' + error.status));
             });
         self.getBaseUrl = self.getBaseURL = function () {
 
@@ -146,11 +150,14 @@ export class Behaviours {
                     var url = behaviour.path;
                     for (var key in keys) if (typeof params[keys[key]] === 'object') {
 
-                        var value = getValueForParameter(params[keys[key]], behaviourData, keys[key], behaviourName);
+                        var value = getValueForParameter(params[keys[key]], behaviourData, keys[key],
+                            behaviourName);
                         var type = params[keys[key]].type;
                         if (value === undefined && type !== 'path') continue;
-                        if (Array.isArray(params[keys[key]].unless) && params[keys[key]].unless.indexOf(behaviourName) > -1) continue;
-                        if (Array.isArray(params[keys[key]].for) && params[keys[key]].for.indexOf(behaviourName) === -1) continue;
+                        if (Array.isArray(params[keys[key]].unless) &&
+                            params[keys[key]].unless.indexOf(behaviourName) > -1) continue;
+                        if (Array.isArray(params[keys[key]].for) &&
+                            params[keys[key]].for.indexOf(behaviourName) === -1) continue;
                         switch (type) {
 
                             case 'header':
@@ -169,7 +176,8 @@ export class Behaviours {
                                 if (lastPath) nestedData[lastPath] = value;
                                 break;
                             case 'path':
-                                url = url.replace(':' + encodeURIComponent(params[keys[key]].key), value ? encodeURIComponent(value) : '*');
+                                url = url.replace(':' + encodeURIComponent(params[keys[key]].key),
+                                    value ? encodeURIComponent(value) : '*');
                                 break;
                             case 'query':
                                 var and = '&';
@@ -178,77 +186,108 @@ export class Behaviours {
                                     url += '?';
                                     and = '';
                                 }
-                                url += and + encodeURIComponent(params[keys[key]].key) + '=' + encodeURIComponent(value);
+                                url += and + encodeURIComponent(params[keys[key]].key) + '=' +
+                                    encodeURIComponent(value);
                                 break;
                         }
                     }
-                    return http.request(new Request({
+                    var request = function (signature) {
 
-                        method: RequestMethod[behaviour.method.slice(0, 1).toUpperCase() + behaviour.method.slice(1).toLowerCase()],
-                        url: (typeof baseURL === 'string' && baseURL.length > 0 ? typeof baseURL.split('/')[0] === 'string' &&
-                            baseURL.split('/')[0].startsWith('http') ? baseURL : window.location.origin + baseURL : '') + url,
-                        headers: new Headers(headers),
-                        body: data
-                    })).map((response) => {
+                        var observable = http.request(new Request({
 
-                        headers = {};
-                        data = {};
-                        if (typeof behaviour.returns === 'object' && Object.keys(behaviour.returns).filter(function (key) {
+                            method: RequestMethod[behaviour.method.slice(0, 1).toUpperCase() +
+                                behaviour.method.slice(1).toLowerCase()],
+                            url: (typeof baseURL === 'string' && baseURL.length > 0 ?
+                                typeof baseURL.split('/')[0] === 'string' &&
+                                    baseURL.split('/')[0].startsWith('http') ? baseURL :
+                                    window.location.origin + baseURL : '') + url,
+                            headers: new Headers(!signature ? headers : Object.assign(headers, {
 
-                            var paramValue, paramKey;
-                            if (behaviour.returns[key].type === 'header')
-                                headers[paramKey = behaviour.returns[key].key || key] = paramValue = response.headers.get(key);
-                            if (behaviour.returns[key].type === 'body' && typeof response.json().response === 'object' && !data[key])
-                                data[paramKey = key] = paramValue = Array.isArray(response.json().response) ? response.json().response : response.json().response[key];
-                            if (behaviour.returns[key].purpose && paramValue && paramKey) {
+                                'Behaviour-Signature': signature
+                            })),
+                            body: data
+                        })).catch(function (error) {
 
-                                if (!Array.isArray(behaviour.returns[key].purpose)) behaviour.returns[key].purpose = [behaviour.returns[key].purpose];
-                                for (var index in behaviour.returns[key].purpose) {
+                            var err = new Error((error.json() && error.json().message) || error.statusText ||
+                                ('Error status: ' + error.status));
+                            err.code = error.status;
+                            var throwing = Observable.throw(err);
+                            if (errorCallback) errorCallback(err);
+                            return throwing;
+                        });
+                        return signature ? observable : observable.expand(function (response) {
 
-                                    var purpose = behaviour.returns[key].purpose[index];
-                                    switch (typeof purpose === 'object' ? purpose.as : purpose) {
+                            var sig = response.json().signature;
+                            if (sig) return request(sig);
+                            else return Observable.of();
+                        }).filter(function (response) {
 
-                                        case 'parameter':
-                                            var param = getParamterFromCache('localStorage');
-                                            param[paramKey] = parameters[paramKey] = {
+                            return response instanceof Response;
+                        }).skipWhile(function (response) {
 
-                                                key: key,
-                                                type: behaviour.returns[key].type
-                                            };
-                                            if (Array.isArray(purpose.unless)) param[paramKey].unless = parameters[paramKey].unless = purpose.unless;
-                                            if (Array.isArray(purpose.for)) param[paramKey].for = parameters[paramKey].for = purpose.for;
-                                            if (behaviour.returns[key].purpose.filter(function (p) {
+                            return !!response.json().signature;
+                        }).map(function (response) {
 
-                                                return p === 'constant' || p.as === 'constant';
-                                            }).length > 0) param[paramKey].value = parameters[paramKey].value = paramValue;
-                                            param[paramKey].source = parameters[paramKey].source = 'localStorage';
-                                            setParameterToCache(param, paramKey);
-                                            break;
+                            headers = {};
+                            data = {};
+                            if (typeof behaviour.returns === 'object' &&
+                                Object.keys(behaviour.returns).filter(function (key) {
+
+                                    var paramValue, paramKey;
+                                    if (behaviour.returns[key].type === 'header')
+                                        headers[paramKey = behaviour.returns[key].key || key] =
+                                            paramValue = response.headers.get(key);
+                                    if (behaviour.returns[key].type === 'body' &&
+                                        typeof response.json().response === 'object' && !data[key])
+                                        data[paramKey = key] = paramValue =
+                                            Array.isArray(response.json().response) ?
+                                                response.json().response : response.json().response[key];
+                                    if (behaviour.returns[key].purpose && paramValue && paramKey) {
+
+                                        if (!Array.isArray(behaviour.returns[key].purpose))
+                                            behaviour.returns[key].purpose = [behaviour.returns[key].purpose];
+                                        for (var index in behaviour.returns[key].purpose) {
+
+                                            var purpose = behaviour.returns[key].purpose[index];
+                                            switch (typeof purpose === 'object' ? purpose.as : purpose) {
+
+                                                case 'parameter':
+                                                    var param = getParamterFromCache('localStorage');
+                                                    param[paramKey] = parameters[paramKey] = {
+
+                                                        key: key,
+                                                        type: behaviour.returns[key].type
+                                                    };
+                                                    if (Array.isArray(purpose.unless))
+                                                        param[paramKey].unless = parameters[paramKey].unless =
+                                                            purpose.unless;
+                                                    if (Array.isArray(purpose.for)) param[paramKey].for =
+                                                        parameters[paramKey].for = purpose.for;
+                                                    if (behaviour.returns[key].purpose.filter(function (p) {
+
+                                                        return p === 'constant' || p.as === 'constant';
+                                                    }).length > 0) param[paramKey].value =
+                                                        parameters[paramKey].value = paramValue;
+                                                    param[paramKey].source = parameters[paramKey].source =
+                                                        'localStorage';
+                                                    setParameterToCache(param, paramKey);
+                                                    break;
+                                            }
+                                        }
                                     }
-                                }
-                            }
-                            return behaviour.returns[key].type === 'header';
-                        }).length > 0) {
+                                    return behaviour.returns[key].type === 'header';
+                                }).length > 0) {
 
-                            return Object.assign(headers, Object.keys(data).length === 0 ? {
+                                return Object.assign(headers, Object.keys(data).length === 0 ? {
 
-                                data: response.json().response
-                            } : data);
-                        } else return response.json().response;
-                    }).catch((error) => {
-
-                        var err = new Error((error.json() && error.json().message) || error.statusText ||
-                            ('Error status: ' + error.status));
-                        err.code = error.status;
-                        var throwing = Observable.throw(err);
-                        if (errorCallback) errorCallback(err);
-                        return throwing;
-                    });
+                                    data: response.json().response
+                                } : data);
+                            } else return response.json().response;
+                        });
+                    };
+                    return request();
                 };
-            } else {
-
-                throw new Error('This behaviour does not exist.');
-            }
+            } else throw new Error('This behaviour does not exist.');
         };
     }
 }
