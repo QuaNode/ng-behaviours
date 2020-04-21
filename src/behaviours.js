@@ -8,7 +8,8 @@ import {
     Http,
     Request,
     RequestMethod,
-    Headers
+    Headers,
+    Response
 } from '@angular/http';
 import {
     Observable
