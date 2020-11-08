@@ -5,12 +5,10 @@ import {
     Inject
 } from '@angular/core';
 import {
-    Http,
-    Request,
-    RequestMethod,
-    Headers,
-    Response
-} from '@angular/http';
+    HttpClient,
+    HttpHeaders,
+    HttpResponse
+} from '@angular/common/http';
 import {
     Observable
 } from 'rxjs';
@@ -87,42 +85,42 @@ export class Behaviours {
         var behavioursBody = null;
         var behavioursHeaders = null;
         var callbacks = [];
-        if (!behavioursBody) try {
+        if (!behavioursBody) {
 
-            http.get((typeof baseURL === 'string' && baseURL.length > 0 ?
+            var behaviours_request_url = (typeof baseURL === 'string' && baseURL.length > 0 ?
                 typeof baseURL.split('/')[0] === 'string' && baseURL.split('/')[0].startsWith('http') ?
-                    baseURL : window.location.origin + baseURL : '') +
-                '/behaviours').subscribe(function (response) {
+                    baseURL : window.location.origin + baseURL : '') + '/behaviours';
+            http.get(behaviours_request_url, {
 
-                    behavioursBody = response.json();
-                    behavioursHeaders = {
+                observe: 'response'
+            }).subscribe((response) => {
 
-                        'Content-Type': response.headers.get('Content-Type')
-                    };
-                    if (typeof behavioursBody === 'object') {
+                behavioursBody = response.body;
+                behavioursHeaders = {
 
-                        var keys = Object.keys(behavioursBody);
-                        for (var i = 0; i < keys.length; i++) {
+                    'Content-Type': response.headers.get('Content-Type')
+                };
+                if (typeof behavioursBody === 'object') {
 
-                            self[keys[i]] = self.getBehaviour(keys[i]);
-                        }
-                        for (i in callbacks) {
+                    var keys = Object.keys(behavioursBody);
+                    for (var i = 0; i < keys.length; i++) {
 
-                            var callback = callbacks[i];
-                            if (typeof callback === 'function') callback();
-                        }
-                    } else {
-
-                        throw new Error('Error in initializing Behaviours');
+                        self[keys[i]] = self.getBehaviour(keys[i]);
                     }
-                }, function (error) {
+                    for (i in callbacks) {
 
-                    throw new Error('Error in initializing Behaviours: ' + error.json().message ||
-                        error.statusText || ('Error status: ' + error.status));
-                });
-        } catch (error) {
+                        var callback = callbacks[i];
+                        if (typeof callback === 'function') callback();
+                    }
+                } else {
 
-            throw new Error('Error in initializing Behaviours: ' + error.message);
+                    throw new Error('Error in initializing Behaviours');
+                }
+            }, (error) => {
+
+                throw new Error('Error in initializing Behaviours: ' + error.message ||
+                    error.statusText || ('Error status: ' + error.status));
+            });
         }
         self.getBaseUrl = self.getBaseURL = function () {
 
@@ -162,25 +160,23 @@ export class Behaviours {
                     var headers = Object.assign({}, behavioursHeaders);
                     var data = {};
                     var url = behaviour.path;
-                    for (var index in keys) {
+                    for (var key in keys) if (typeof params[keys[key]] === 'object') {
 
-                        var param = params[keys[index]];
-                        if (typeof param !== 'object') continue;
-                        var value = getValueForParameter(param, behaviourData, keys[index],
+                        var value = getValueForParameter(params[keys[key]], behaviourData, keys[key],
                             behaviourName);
-                        var type = param.type;
+                        var type = params[keys[key]].type;
                         if (value === undefined && type !== 'path') continue;
-                        if (Array.isArray(param.unless) && param.unless.indexOf(behaviourName) > -1)
-                            continue;
-                        if (Array.isArray(param.for) && param.for.indexOf(behaviourName) === -1)
-                            continue;
+                        if (Array.isArray(params[keys[key]].unless) &&
+                            params[keys[key]].unless.indexOf(behaviourName) > -1) continue;
+                        if (Array.isArray(params[keys[key]].for) &&
+                            params[keys[key]].for.indexOf(behaviourName) === -1) continue;
                         switch (type) {
 
                             case 'header':
-                                headers[param.key] = value;
+                                headers[params[keys[key]].key] = value;
                                 break;
                             case 'body':
-                                var paths = param.key.split('.');
+                                var paths = params[keys[key]].key.split('.');
                                 var nestedData = data;
                                 var lastPath = null;
                                 for (var path in paths) {
@@ -192,7 +188,7 @@ export class Behaviours {
                                 if (lastPath) nestedData[lastPath] = value;
                                 break;
                             case 'path':
-                                url = url.replace(':' + encodeURIComponent(param.key),
+                                url = url.replace(':' + encodeURIComponent(params[keys[key]].key),
                                     value ? encodeURIComponent(value) : '*');
                                 break;
                             case 'query':
@@ -202,30 +198,31 @@ export class Behaviours {
                                     url += '?';
                                     and = '';
                                 }
-                                url += and + encodeURIComponent(param.key) + '=' +
+                                url += and + encodeURIComponent(params[keys[key]].key) + '=' +
                                     encodeURIComponent(value);
                                 break;
                         }
                     }
                     var request = function (signature) {
 
-                        var observable = http.request(new Request({
+                        var request_method = behaviour.method.slice(0, 1).toUpperCase() +
+                            behaviour.method.slice(1).toLowerCase();
+                        var request_url = (typeof baseURL === 'string' && baseURL.length > 0 ?
+                            typeof baseURL.split('/')[0] === 'string' &&
+                                baseURL.split('/')[0].startsWith('http') ? baseURL :
+                                window.location.origin + baseURL : '') + url
+                        var observable = http.request(request_method, request_url, {
 
-                            method: RequestMethod[behaviour.method.slice(0, 1).toUpperCase() +
-                                behaviour.method.slice(1).toLowerCase()],
-                            url: (typeof baseURL === 'string' && baseURL.length > 0 ?
-                                typeof baseURL.split('/')[0] === 'string' &&
-                                    baseURL.split('/')[0].startsWith('http') ? baseURL :
-                                    window.location.origin + baseURL : '') + url,
-                            headers: new Headers(!signature ? headers : Object.assign(headers, {
+                            headers: new HttpHeaders(!signature ? headers : Object.assign(headers, {
 
                                 'Behaviour-Signature': signature
                             })),
-                            body: data
-                        })).catch(function (error) {
+                            body: data,
+                            observe: 'response'
+                        }).catch(function (error) {
 
-                            var err = new Error((error.json() && error.json().message) || error.statusText ||
-                                ('Error status: ' + error.status));
+                            var err = new Error(error.message || error.statusText || ('Error status: ' +
+                                error.status));
                             err.code = error.status;
                             var throwing = Observable.throw(err);
                             if (errorCallback) errorCallback(err);
@@ -233,15 +230,15 @@ export class Behaviours {
                         });
                         return signature ? observable : observable.expand(function (response) {
 
-                            var sig = response.json().signature;
+                            var sig = response.body.signature;
                             if (sig) return request(sig);
                             else return Observable.of();
                         }).filter(function (response) {
 
-                            return response instanceof Response;
+                            return response instanceof HttpResponse;
                         }).skipWhile(function (response) {
 
-                            return !!response.json().signature;
+                            return !!response.body.signature;
                         }).map(function (response) {
 
                             headers = {};
@@ -254,18 +251,17 @@ export class Behaviours {
                                         headers[paramKey = behaviour.returns[key].key || key] =
                                             paramValue = response.headers.get(key);
                                     if (behaviour.returns[key].type === 'body' &&
-                                        typeof response.json().response === 'object' && !data[key])
+                                        typeof response.body.response === 'object' && !data[key])
                                         data[paramKey = key] = paramValue =
-                                            Array.isArray(response.json().response) ?
-                                                response.json().response : response.json().response[key];
-                                    var purposes = behaviour.returns[key].purpose;
-                                    if (purposes && paramValue && paramKey) {
+                                            Array.isArray(response.body.response) ?
+                                                response.body.response : response.body.response[key];
+                                    if (behaviour.returns[key].purpose && paramValue && paramKey) {
 
-                                        if (!Array.isArray(purposes))
-                                            purposes = behaviour.returns[key].purpose = [purposes];
-                                        for (var index in purposes) {
+                                        if (!Array.isArray(behaviour.returns[key].purpose))
+                                            behaviour.returns[key].purpose = [behaviour.returns[key].purpose];
+                                        for (var index in behaviour.returns[key].purpose) {
 
-                                            var purpose = purposes[index];
+                                            var purpose = behaviour.returns[key].purpose[index];
                                             switch (typeof purpose === 'object' ? purpose.as : purpose) {
 
                                                 case 'parameter':
@@ -280,10 +276,9 @@ export class Behaviours {
                                                             purpose.unless;
                                                     if (Array.isArray(purpose.for)) param[paramKey].for =
                                                         parameters[paramKey].for = purpose.for;
-                                                    if (purposes.filter(function (otherPurpose) {
+                                                    if (behaviour.returns[key].purpose.filter(function (p) {
 
-                                                        return otherPurpose === 'constant' ||
-                                                            otherPurpose.as === 'constant';
+                                                        return p === 'constant' || p.as === 'constant';
                                                     }).length > 0) param[paramKey].value =
                                                         parameters[paramKey].value = paramValue;
                                                     param[paramKey].source = parameters[paramKey].source =
@@ -298,9 +293,9 @@ export class Behaviours {
 
                                 return Object.assign(headers, Object.keys(data).length === 0 ? {
 
-                                    data: response.json().response
+                                    data: response.body.response
                                 } : data);
-                            } else return response.json().response;
+                            } else return response.body.response;
                         });
                     };
                     return request();
@@ -315,5 +310,5 @@ Behaviours.annotations = [
 ];
 
 Behaviours.parameters = [
-    [new Inject(Http)]
+    [new Inject(HttpClient)]
 ];
