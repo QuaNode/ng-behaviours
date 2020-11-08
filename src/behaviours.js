@@ -24,11 +24,12 @@ var sourceStorage = {};
 
 var getValueForParameter = function (parameter, data, key, name) {
 
-    if (typeof data === 'object' && typeof key === 'string' && data[key] !== undefined) return data[key];
+    if (typeof data === 'object' && typeof key === 'string' && data[key] !== undefined)
+        return data[key];
     else return (function () {
 
-        if (parameter.value) return typeof parameter.value === 'function' ? parameter.value(name, data) :
-            parameter.value;
+        if (parameter.value) return typeof parameter.value === 'function' ?
+            parameter.value(name, data) : parameter.value;
         else return getParamterFromCache(parameter.source, key)[key].value;
     }());
 };
@@ -37,7 +38,8 @@ var getParamterFromCache = function (source, key) {
 
     var getItem = function () {
 
-        return JSON.parse(window[source].getItem('Behaviours') || (key ? '{"' + key + '":{}}' : '{}'));
+        return JSON.parse(window[source].getItem('Behaviours') ||
+            (key ? '{"' + key + '":{}}' : '{}'));
     };
     if (typeof source === 'string' && typeof window[source] === 'object') {
 
@@ -85,15 +87,16 @@ export class Behaviours {
         var behavioursBody = null;
         var behavioursHeaders = null;
         var callbacks = [];
-        if (!behavioursBody) {
+        if (!behavioursBody) try {
 
             var behaviours_request_url = (typeof baseURL === 'string' && baseURL.length > 0 ?
-                typeof baseURL.split('/')[0] === 'string' && baseURL.split('/')[0].startsWith('http') ?
+                typeof baseURL.split('/')[0] === 'string' &&
+                    baseURL.split('/')[0].startsWith('http') ?
                     baseURL : window.location.origin + baseURL : '') + '/behaviours';
             http.get(behaviours_request_url, {
 
                 observe: 'response'
-            }).subscribe((response) => {
+            }).subscribe(function (response) {
 
                 behavioursBody = response.body;
                 behavioursHeaders = {
@@ -116,11 +119,14 @@ export class Behaviours {
 
                     throw new Error('Error in initializing Behaviours');
                 }
-            }, (error) => {
+            }, function (error) {
 
                 throw new Error('Error in initializing Behaviours: ' + error.message ||
                     error.statusText || ('Error status: ' + error.status));
             });
+        } catch (error) {
+
+            throw new Error('Error in initializing Behaviours: ' + error.message);
         }
         self.getBaseUrl = self.getBaseURL = function () {
 
@@ -150,33 +156,37 @@ export class Behaviours {
                 return function (behaviourData) {
 
                     if (typeof behaviourData !== 'object') behaviourData = {};
-                    var parameters = Object.assign(getParamterFromCache('localStorage'), defaults || {});
-                    var params = Object.keys(behaviour.parameters || {}).reduce(function (params, key) {
+                    var parameters =
+                        Object.assign(getParamterFromCache('localStorage'), defaults || {});
+                    var params =
+                        Object.keys(behaviour.parameters || {}).reduce(function (params, key) {
 
-                        params[key] = parameters[key] || behaviour.parameters[key];
-                        return params;
-                    }, {});
+                            params[key] = parameters[key] || behaviour.parameters[key];
+                            return params;
+                        }, {});
                     var keys = Object.keys(params);
                     var headers = Object.assign({}, behavioursHeaders);
                     var data = {};
                     var url = behaviour.path;
-                    for (var key in keys) if (typeof params[keys[key]] === 'object') {
+                    for (var index in keys) {
 
-                        var value = getValueForParameter(params[keys[key]], behaviourData, keys[key],
+                        var param = params[keys[index]];
+                        if (typeof param !== 'object') continue;
+                        var value = getValueForParameter(param, behaviourData, keys[index],
                             behaviourName);
-                        var type = params[keys[key]].type;
+                        var type = param.type;
                         if (value === undefined && type !== 'path') continue;
-                        if (Array.isArray(params[keys[key]].unless) &&
-                            params[keys[key]].unless.indexOf(behaviourName) > -1) continue;
-                        if (Array.isArray(params[keys[key]].for) &&
-                            params[keys[key]].for.indexOf(behaviourName) === -1) continue;
+                        if (Array.isArray(param.unless) &&
+                            param.unless.indexOf(behaviourName) > -1) continue;
+                        if (Array.isArray(param.for) && param.for.indexOf(behaviourName) === -1)
+                            continue;
                         switch (type) {
 
                             case 'header':
-                                headers[params[keys[key]].key] = value;
+                                headers[param.key] = value;
                                 break;
                             case 'body':
-                                var paths = params[keys[key]].key.split('.');
+                                var paths = param.key.split('.');
                                 var nestedData = data;
                                 var lastPath = null;
                                 for (var path in paths) {
@@ -188,7 +198,7 @@ export class Behaviours {
                                 if (lastPath) nestedData[lastPath] = value;
                                 break;
                             case 'path':
-                                url = url.replace(':' + encodeURIComponent(params[keys[key]].key),
+                                url = url.replace(':' + encodeURIComponent(param.key),
                                     value ? encodeURIComponent(value) : '*');
                                 break;
                             case 'query':
@@ -198,7 +208,7 @@ export class Behaviours {
                                     url += '?';
                                     and = '';
                                 }
-                                url += and + encodeURIComponent(params[keys[key]].key) + '=' +
+                                url += and + encodeURIComponent(param.key) + '=' +
                                     encodeURIComponent(value);
                                 break;
                         }
@@ -213,16 +223,17 @@ export class Behaviours {
                                 window.location.origin + baseURL : '') + url
                         var observable = http.request(request_method, request_url, {
 
-                            headers: new HttpHeaders(!signature ? headers : Object.assign(headers, {
+                            headers: new HttpHeaders(!signature ?
+                                headers : Object.assign(headers, {
 
-                                'Behaviour-Signature': signature
-                            })),
+                                    'Behaviour-Signature': signature
+                                })),
                             body: data,
                             observe: 'response'
                         }).catch(function (error) {
 
-                            var err = new Error(error.message || error.statusText || ('Error status: ' +
-                                error.status));
+                            var err = new Error(error.message || error.statusText ||
+                                ('Error status: ' + error.status));
                             err.code = error.status;
                             var throwing = Observable.throw(err);
                             if (errorCallback) errorCallback(err);
@@ -254,35 +265,42 @@ export class Behaviours {
                                         typeof response.body.response === 'object' && !data[key])
                                         data[paramKey = key] = paramValue =
                                             Array.isArray(response.body.response) ?
-                                                response.body.response : response.body.response[key];
-                                    if (behaviour.returns[key].purpose && paramValue && paramKey) {
+                                                response.body.response :
+                                                response.body.response[key];
+                                    var purposes = behaviour.returns[key].purpose;
+                                    if (purposes && paramValue && paramKey) {
 
-                                        if (!Array.isArray(behaviour.returns[key].purpose))
-                                            behaviour.returns[key].purpose = [behaviour.returns[key].purpose];
-                                        for (var index in behaviour.returns[key].purpose) {
+                                        if (!Array.isArray(purposes))
+                                            purposes = behaviour.returns[key].purpose = [purposes];
+                                        for (var index in purposes) {
 
-                                            var purpose = behaviour.returns[key].purpose[index];
-                                            switch (typeof purpose === 'object' ? purpose.as : purpose) {
+                                            var purpose = purposes[index];
+                                            switch (typeof purpose === 'object' ?
+                                                purpose.as : purpose) {
 
                                                 case 'parameter':
-                                                    var param = getParamterFromCache('localStorage');
+                                                    var param =
+                                                        getParamterFromCache('localStorage');
                                                     param[paramKey] = parameters[paramKey] = {
 
                                                         key: key,
                                                         type: behaviour.returns[key].type
                                                     };
                                                     if (Array.isArray(purpose.unless))
-                                                        param[paramKey].unless = parameters[paramKey].unless =
+                                                        param[paramKey].unless =
+                                                            parameters[paramKey].unless =
                                                             purpose.unless;
-                                                    if (Array.isArray(purpose.for)) param[paramKey].for =
-                                                        parameters[paramKey].for = purpose.for;
-                                                    if (behaviour.returns[key].purpose.filter(function (p) {
+                                                    if (Array.isArray(purpose.for))
+                                                        param[paramKey].for =
+                                                            parameters[paramKey].for = purpose.for;
+                                                    if (purposes.filter(function (otherPurpose) {
 
-                                                        return p === 'constant' || p.as === 'constant';
+                                                        return otherPurpose === 'constant' ||
+                                                            otherPurpose.as === 'constant';
                                                     }).length > 0) param[paramKey].value =
                                                         parameters[paramKey].value = paramValue;
-                                                    param[paramKey].source = parameters[paramKey].source =
-                                                        'localStorage';
+                                                    param[paramKey].source =
+                                                        parameters[paramKey].source = 'localStorage';
                                                     setParameterToCache(param, paramKey);
                                                     break;
                                             }
