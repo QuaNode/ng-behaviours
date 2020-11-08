@@ -87,9 +87,12 @@ export class Behaviours {
         var behavioursBody = null;
         var behavioursHeaders = null;
         var callbacks = [];
-        if (!behavioursBody) http.get((typeof baseURL === 'string' && baseURL.length > 0 ?
-            typeof baseURL.split('/')[0] === 'string' && baseURL.split('/')[0].startsWith('http') ?
-                baseURL : window.location.origin + baseURL : '') + '/behaviours').subscribe((response) => {
+        if (!behavioursBody) try {
+
+            http.get((typeof baseURL === 'string' && baseURL.length > 0 ?
+                typeof baseURL.split('/')[0] === 'string' && baseURL.split('/')[0].startsWith('http') ?
+                    baseURL : window.location.origin + baseURL : '') +
+                '/behaviours').subscribe(function (response) {
 
                     behavioursBody = response.json();
                     behavioursHeaders = {
@@ -112,11 +115,15 @@ export class Behaviours {
 
                         throw new Error('Error in initializing Behaviours');
                     }
-                }, (error) => {
+                }, function (error) {
 
                     throw new Error('Error in initializing Behaviours: ' + error.json().message ||
                         error.statusText || ('Error status: ' + error.status));
                 });
+        } catch (error) {
+
+            throw new Error('Error in initializing Behaviours: ' + error.message);
+        }
         self.getBaseUrl = self.getBaseURL = function () {
 
             return baseURL;
@@ -155,23 +162,25 @@ export class Behaviours {
                     var headers = Object.assign({}, behavioursHeaders);
                     var data = {};
                     var url = behaviour.path;
-                    for (var key in keys) if (typeof params[keys[key]] === 'object') {
+                    for (var index in keys) {
 
-                        var value = getValueForParameter(params[keys[key]], behaviourData, keys[key],
+                        var param = params[keys[index]];
+                        if (typeof param !== 'object') continue;
+                        var value = getValueForParameter(param, behaviourData, keys[index],
                             behaviourName);
-                        var type = params[keys[key]].type;
+                        var type = param.type;
                         if (value === undefined && type !== 'path') continue;
-                        if (Array.isArray(params[keys[key]].unless) &&
-                            params[keys[key]].unless.indexOf(behaviourName) > -1) continue;
-                        if (Array.isArray(params[keys[key]].for) &&
-                            params[keys[key]].for.indexOf(behaviourName) === -1) continue;
+                        if (Array.isArray(param.unless) && param.unless.indexOf(behaviourName) > -1)
+                            continue;
+                        if (Array.isArray(param.for) && param.for.indexOf(behaviourName) === -1)
+                            continue;
                         switch (type) {
 
                             case 'header':
-                                headers[params[keys[key]].key] = value;
+                                headers[param.key] = value;
                                 break;
                             case 'body':
-                                var paths = params[keys[key]].key.split('.');
+                                var paths = param.key.split('.');
                                 var nestedData = data;
                                 var lastPath = null;
                                 for (var path in paths) {
@@ -183,7 +192,7 @@ export class Behaviours {
                                 if (lastPath) nestedData[lastPath] = value;
                                 break;
                             case 'path':
-                                url = url.replace(':' + encodeURIComponent(params[keys[key]].key),
+                                url = url.replace(':' + encodeURIComponent(param.key),
                                     value ? encodeURIComponent(value) : '*');
                                 break;
                             case 'query':
@@ -193,7 +202,7 @@ export class Behaviours {
                                     url += '?';
                                     and = '';
                                 }
-                                url += and + encodeURIComponent(params[keys[key]].key) + '=' +
+                                url += and + encodeURIComponent(param.key) + '=' +
                                     encodeURIComponent(value);
                                 break;
                         }
@@ -249,13 +258,14 @@ export class Behaviours {
                                         data[paramKey = key] = paramValue =
                                             Array.isArray(response.json().response) ?
                                                 response.json().response : response.json().response[key];
-                                    if (behaviour.returns[key].purpose && paramValue && paramKey) {
+                                    var purposes = behaviour.returns[key].purpose;
+                                    if (purposes && paramValue && paramKey) {
 
-                                        if (!Array.isArray(behaviour.returns[key].purpose))
-                                            behaviour.returns[key].purpose = [behaviour.returns[key].purpose];
-                                        for (var index in behaviour.returns[key].purpose) {
+                                        if (!Array.isArray(purposes))
+                                            purposes = behaviour.returns[key].purpose = [purposes];
+                                        for (var index in purposes) {
 
-                                            var purpose = behaviour.returns[key].purpose[index];
+                                            var purpose = purposes[index];
                                             switch (typeof purpose === 'object' ? purpose.as : purpose) {
 
                                                 case 'parameter':
@@ -270,9 +280,10 @@ export class Behaviours {
                                                             purpose.unless;
                                                     if (Array.isArray(purpose.for)) param[paramKey].for =
                                                         parameters[paramKey].for = purpose.for;
-                                                    if (behaviour.returns[key].purpose.filter(function (p) {
+                                                    if (purposes.filter(function (otherPurpose) {
 
-                                                        return p === 'constant' || p.as === 'constant';
+                                                        return otherPurpose === 'constant' ||
+                                                            otherPurpose.as === 'constant';
                                                     }).length > 0) param[paramKey].value =
                                                         parameters[paramKey].value = paramValue;
                                                     param[paramKey].source = parameters[paramKey].source =
