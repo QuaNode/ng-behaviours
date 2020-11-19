@@ -121,8 +121,9 @@ export class Behaviours {
                 }
             }, function (error) {
 
-                throw new Error('Error in initializing Behaviours: ' + error.message ||
-                    error.statusText || ('Error status: ' + error.status));
+                throw new Error('Error in initializing Behaviours: ' + (error.error &&
+                    error.error.message) || error.message || error.statusText ||
+                    ('Error status: ' + error.status));
             });
         } catch (error) {
 
@@ -232,8 +233,9 @@ export class Behaviours {
                             observe: 'response'
                         }).catch(function (error) {
 
-                            var err = new Error(error.message || error.statusText ||
-                                ('Error status: ' + error.status));
+                            var err = new Error((error.error && error.error.message) ||
+                                error.message || error.statusText || ('Error status: ' +
+                                    error.status));
                             err.code = error.status;
                             var throwing = Observable.throw(err);
                             if (errorCallback) errorCallback(err);

@@ -1,6 +1,6 @@
 {
     "name": "ng-behaviours",
-    "version": "8.0.0",
+    "version": "8.1.0",
     "description": "This is an Angular 8 client for Behaviours.",
     "repository": {
         "type": "git",
