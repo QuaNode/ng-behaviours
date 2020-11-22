@@ -1,6 +1,6 @@
 # ng-behaviours
-Behaviours client Angular 5
+Behaviours client Angular 8
 
 ```
-npm install ng-behaviours@^3.0.0
+npm install ng-behaviours@^8.0.0
 ```
