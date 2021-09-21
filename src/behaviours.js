@@ -4,6 +4,7 @@ import {
     Injectable,
     Inject
 } from '@angular/core';
+
 import {
     Http,
     Request,
@@ -11,9 +12,12 @@ import {
     Headers,
     Response
 } from '@angular/http';
+
 import {
     Observable
 } from 'rxjs';
+
+import * as io from 'socket.io-client';
 
 var sourceStorage = {};
 
@@ -200,20 +204,25 @@ export class Behaviours {
                                 break;
                         }
                     }
+                    var socket;
+                    var events;
+                    var events_token;
                     var request = function (signature) {
 
+                        var reqMethod = RequestMethod[behaviour.method.slice(0, 1).toUpperCase() +
+                            behaviour.method.slice(1).toLowerCase()];
+                        var reqURL = (typeof baseURL === 'string' && baseURL.length > 0 ? typeof
+                            baseURL.split('/')[0] === 'string' && baseURL.split('/')[0].startsWith('http') ?
+                            baseURL : window.location.origin + baseURL : '') + url;
+                        var reqHeaders = new Headers(!signature ? headers : Object.assign(headers, {
+
+                            'Behaviour-Signature': signature
+                        }));
                         var observable = http.request(new Request({
 
-                            method: RequestMethod[behaviour.method.slice(0, 1).toUpperCase() +
-                                behaviour.method.slice(1).toLowerCase()],
-                            url: (typeof baseURL === 'string' && baseURL.length > 0 ?
-                                typeof baseURL.split('/')[0] === 'string' &&
-                                    baseURL.split('/')[0].startsWith('http') ? baseURL :
-                                    window.location.origin + baseURL : '') + url,
-                            headers: new Headers(!signature ? headers : Object.assign(headers, {
-
-                                'Behaviour-Signature': signature
-                            })),
+                            method: reqMethod,
+                            url: reqURL,
+                            headers: reqHeaders,
                             body: data
                         })).catch(function (error) {
 
@@ -239,6 +248,8 @@ export class Behaviours {
 
                             headers = {};
                             data = {};
+                            events = response.json().events;
+                            events_token = response.json().events_token;
                             if (typeof behaviour.returns === 'object' &&
                                 Object.keys(behaviour.returns).filter(function (key) {
 
@@ -275,10 +286,10 @@ export class Behaviours {
                                                         parameters[paramKey].for = purpose.for;
                                                     if (purposes.filter(function (otherPurpose) {
 
-                                                            return otherPurpose === 'constant' ||
-                                                                otherPurpose.as === 'constant';
-                                                        }).length > 0) param[paramKey].value =
-                                                            parameters[paramKey].value = paramValue;
+                                                        return otherPurpose === 'constant' ||
+                                                            otherPurpose.as === 'constant';
+                                                    }).length > 0) param[paramKey].value =
+                                                        parameters[paramKey].value = paramValue;
                                                     param[paramKey].source = parameters[paramKey].source =
                                                         'localStorage';
                                                     setParameterToCache(param, paramKey);
@@ -294,6 +305,43 @@ export class Behaviours {
                                     data: response.json().response
                                 } : data);
                             } else return response.json().response;
+                        }).expand(function () {
+
+                            if (!socket && events_token && Array.isArray(events)) {
+
+                                var socketPath = behaviour.prefix + '/events';
+                                var socketURL = reqURL.split(behaviour.prefix)[0] + socketPath;
+                                return Observable.create(function (observer) {
+
+                                    socket = (io.default || io)(socketURL, {
+
+                                        path: socketPath,
+                                        transports: ['websocket'],
+                                        withCredentials: reqURL.startsWith(window.location.origin) ?
+                                            behaviour.credentials : true,
+                                        auth: {
+
+                                            token: events_token,
+                                            behaviour: behaviourName
+                                        }
+                                    });
+                                    socket.io.on('error', function (error) {
+
+                                        console.log(error);
+                                    });
+                                    socket.on('connect', function () {
+
+                                        events.forEach(function (event) {
+
+                                            socket.emit('join ' + behaviourName, event);
+                                        });
+                                    });
+                                    socket.on(behaviourName, function (response) {
+
+                                        observer.next(response.response);
+                                    });
+                                });
+                            } else return Observable.empty();
                         });
                     };
                     return request();
