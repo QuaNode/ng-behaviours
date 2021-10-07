@@ -223,7 +223,8 @@ export class Behaviours {
                             method: reqMethod,
                             url: reqURL,
                             headers: reqHeaders,
-                            body: data
+                            body: data,
+                            withCredentials: true
                         })).catch(function (error) {
 
                             var err = new Error((error.json() && error.json().message) || error.statusText ||
@@ -338,8 +339,21 @@ export class Behaviours {
                                     });
                                     socket.on(behaviourName, function (response) {
 
-                                        observer.next(response.response);
+                                        if (response) {
+
+                                            if (response.emitter_id == socket.id) return;
+                                            if (response.message) {
+
+                                                var err = new Error(response.message);
+                                                if (errorCallback) errorCallback(err);
+                                            }
+                                            if (response.response) observer.next(response.response);
+                                        }
                                     });
+                                    return function () {
+
+                                        if (socket) socket.disconnect();
+                                    };
                                 });
                             } else return Observable.empty();
                         });
