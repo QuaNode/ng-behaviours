@@ -318,8 +318,7 @@ export class Behaviours {
 
                                         path: socketPath,
                                         transports: ['websocket'],
-                                        withCredentials: reqURL.startsWith(window.location.origin) ?
-                                            behaviour.credentials : true,
+                                        withCredentials: true,
                                         auth: {
 
                                             token: events_token,
