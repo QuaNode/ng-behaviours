@@ -19,17 +19,19 @@ import 'rxjs/add/operator/expand';
 import 'rxjs/add/operator/filter';
 import 'rxjs/add/operator/skipWhile';
 import 'rxjs/add/operator/map';
+import 'rxjs/add/observable/empty';
+
+import * as io from 'socket.io-client';
 
 var sourceStorage = {};
 
 var getValueForParameter = function (parameter, data, key, name) {
 
-    if (typeof data === 'object' && typeof key === 'string' && data[key] !== undefined)
-        return data[key];
+    if (typeof data === 'object' && typeof key === 'string' && data[key] !== undefined) return data[key];
     else return (function () {
 
-        if (parameter.value) return typeof parameter.value === 'function' ?
-            parameter.value(name, data) : parameter.value;
+        if (parameter.value) return typeof parameter.value === 'function' ? parameter.value(name, data) :
+            parameter.value;
         else return getParamterFromCache(parameter.source, key)[key].value;
     }());
 };
@@ -38,8 +40,7 @@ var getParamterFromCache = function (source, key) {
 
     var getItem = function () {
 
-        return JSON.parse(window[source].getItem('Behaviours') ||
-            (key ? '{"' + key + '":{}}' : '{}'));
+        return JSON.parse(window[source].getItem('Behaviours') || (key ? '{"' + key + '":{}}' : '{}'));
     };
     if (typeof source === 'string' && typeof window[source] === 'object') {
 
@@ -89,11 +90,19 @@ export class Behaviours {
         var callbacks = [];
         if (!behavioursBody) try {
 
-            var behaviours_request_url = (typeof baseURL === 'string' && baseURL.length > 0 ?
-                typeof baseURL.split('/')[0] === 'string' &&
-                    baseURL.split('/')[0].startsWith('http') ?
-                    baseURL : window.location.origin + baseURL : '') + '/behaviours';
-            http.get(behaviours_request_url, {
+            var behavioursURL = '';
+            if (typeof baseURL === 'string' && baseURL.length > 0) {
+
+                behavioursURL = baseURL;
+                if (typeof baseURL.split('/')[0] !== 'string' ||
+                    !baseURL.split('/')[0].startsWith('http')) {
+
+                    var originURL = window.location.origin;
+                    behavioursURL = originURL + behavioursURL;
+                }
+            }
+            behavioursURL += '/behaviours';
+            http.get(behavioursURL, {
 
                 observe: 'response'
             }).subscribe(function (response) {
@@ -177,8 +186,8 @@ export class Behaviours {
                             behaviourName);
                         var type = param.type;
                         if (value === undefined && type !== 'path') continue;
-                        if (Array.isArray(param.unless) &&
-                            param.unless.indexOf(behaviourName) > -1) continue;
+                        if (Array.isArray(param.unless) && param.unless.indexOf(behaviourName) > -1)
+                            continue;
                         if (Array.isArray(param.for) && param.for.indexOf(behaviourName) === -1)
                             continue;
                         switch (type) {
@@ -214,28 +223,39 @@ export class Behaviours {
                                 break;
                         }
                     }
+                    var socket;
+                    var events;
+                    var events_token;
                     var request = function (signature) {
 
-                        var request_method = behaviour.method.slice(0, 1).toUpperCase() +
+                        var reqMethod = behaviour.method.slice(0, 1).toUpperCase() +
                             behaviour.method.slice(1).toLowerCase();
-                        var request_url = (typeof baseURL === 'string' && baseURL.length > 0 ?
-                            typeof baseURL.split('/')[0] === 'string' &&
-                                baseURL.split('/')[0].startsWith('http') ? baseURL :
-                                window.location.origin + baseURL : '') + url
-                        var observable = http.request(request_method, request_url, {
+                        var reqURL = '';
+                        if (typeof baseURL === 'string' && baseURL.length > 0) {
 
-                            headers: new HttpHeaders(!signature ?
-                                headers : Object.assign(headers, {
+                            reqURL = baseURL;
+                            if (typeof baseURL.split('/')[0] !== 'string' ||
+                                !baseURL.split('/')[0].startsWith('http')) {
 
-                                    'Behaviour-Signature': signature
-                                })),
+                                var originURL = window.location.origin;
+                                reqURL = originURL + reqURL;
+                            }
+                        }
+                        reqURL += url;
+                        var reqHeaders = new HttpHeaders(!signature ? headers : Object.assign(headers, {
+
+                            'Behaviour-Signature': signature
+                        }));
+                        var observable = http.request(reqMethod, reqURL, {
+
+                            headers: reqHeaders,
                             body: data,
-                            observe: 'response'
+                            observe: 'response',
+                            withCredentials: true
                         }).catch(function (error) {
 
-                            var err = new Error((error.error && error.error.message) ||
-                                error.message || error.statusText || ('Error status: ' +
-                                    error.status));
+                            var err = new Error((error.error && error.error.message) || error.message ||
+                                error.statusText || ('Error status: ' + error.status));
                             err.code = error.status;
                             var throwing = Observable.throw(err);
                             if (errorCallback) errorCallback(err);
@@ -256,6 +276,8 @@ export class Behaviours {
 
                             headers = {};
                             data = {};
+                            events = response.body.events;
+                            events_token = response.body.events_token;
                             if (typeof behaviour.returns === 'object' &&
                                 Object.keys(behaviour.returns).filter(function (key) {
 
@@ -316,6 +338,55 @@ export class Behaviours {
                                     data: response.body.response
                                 } : data);
                             } else return response.body.response;
+                        }).expand(function () {
+
+                            if (!socket && events_token && Array.isArray(events)) {
+
+                                var socketPath = behaviour.prefix + '/events';
+                                var socketURL = reqURL.split(behaviour.prefix)[0] + socketPath;
+                                return Observable.create(function (observer) {
+
+                                    socket = (io.default || io)(socketURL, {
+
+                                        path: socketPath,
+                                        transports: ['websocket'],
+                                        withCredentials: true,
+                                        auth: {
+
+                                            token: events_token,
+                                            behaviour: behaviourName
+                                        }
+                                    });
+                                    socket.io.on('error', function (error) {
+
+                                        console.log(error);
+                                    });
+                                    socket.on('connect', function () {
+
+                                        events.forEach(function (event) {
+
+                                            socket.emit('join ' + behaviourName, event);
+                                        });
+                                    });
+                                    socket.on(behaviourName, function (response) {
+
+                                        if (response) {
+
+                                            if (response.emitter_id == socket.id) return;
+                                            if (response.message) {
+
+                                                var err = new Error(response.message);
+                                                if (errorCallback) errorCallback(err);
+                                            }
+                                            if (response.response) observer.next(response.response);
+                                        }
+                                    });
+                                    return function () {
+
+                                        if (socket) socket.disconnect();
+                                    };
+                                });
+                            } else return Observable.empty();
                         });
                     };
                     return request();

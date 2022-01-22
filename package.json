@@ -1,7 +1,7 @@
 {
     "name": "ng-behaviours",
-    "version": "8.1.0",
-    "description": "This is an Angular 8 client for Behaviours.",
+    "version": "11.0.0",
+    "description": "Angular client for Behaviours.",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/quaNode/Behaviours-AngularJS-Client.git"
@@ -12,6 +12,9 @@
         "url": "https://github.com/quaNode/Behaviours-AngularJS-Client/issues"
     },
     "homepage": "https://github.com/quaNode/Behaviours-AngularJS-Client",
+    "dependencies": {
+        "socket.io-client": "latest"
+    },
     "peerDependencies": {
         "@angular/core": ">= 8.0.0",
         "@angular/http": ">= 8.0.0",
