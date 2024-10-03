@@ -1,6 +1,6 @@
 {
     "name": "ng-behaviours",
-    "version": "3.3.5",
+    "version": "3.4.0",
     "description": "This is an Angular 5 client for Behaviours.",
     "repository": {
         "type": "git",
@@ -12,6 +12,9 @@
         "url": "https://github.com/quaNode/Behaviours-AngularJS-Client/issues"
     },
     "homepage": "https://github.com/quaNode/Behaviours-AngularJS-Client",
+    "dependencies": {
+        "socket.io-client": "latest"
+    },
     "peerDependencies": {
         "@angular/core": ">= 5.2.6 < 8",
         "@angular/http": ">= 5.2.6 < 8",
