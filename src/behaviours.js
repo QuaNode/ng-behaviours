@@ -440,9 +440,11 @@ export class Behaviours {
                             var err = new Error(message);
                             err.code = error.status;
                             var throwing = Observable.throw(err);
-                            if (errorCallback) {
+                            if (errorCallback && errorCallback(...[
+                                err, behaviourName
+                            ]) === false) {
 
-                                errorCallback(err);
+                                throwing = Observable.never();
                             }
                             return throwing;
                         });
