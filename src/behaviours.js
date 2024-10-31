@@ -14,35 +14,66 @@ import {
 } from 'rxjs';
 import 'rxjs/add/observable/throw';
 import 'rxjs/add/observable/of';
+import 'rxjs/add/observable/empty';
+import 'rxjs/add/observable/never';
 import 'rxjs/add/operator/catch';
 import 'rxjs/add/operator/expand';
 import 'rxjs/add/operator/filter';
 import 'rxjs/add/operator/skipWhile';
 import 'rxjs/add/operator/map';
-import 'rxjs/add/observable/empty';
 
 import * as io from 'socket.io-client';
 
 var sourceStorage = {};
 
-var getValueForParameter = function (parameter, data, key, name) {
+var getValueForParameter = function () {
 
-    if (typeof data === 'object' && typeof key === 'string' && data[key] !== undefined) return data[key];
-    else return (function () {
+    var [parameter, data, key, name] = arguments;
+    var not_cached = typeof data === 'object';
+    not_cached &= typeof key === 'string';
+    if (not_cached) {
 
-        if (parameter.value) return typeof parameter.value === 'function' ? parameter.value(name, data) :
-            parameter.value;
-        else return getParamterFromCache(parameter.source, key)[key].value;
-    }());
+        not_cached &= data[key] !== undefined;
+    }
+    if (not_cached) return data[key];
+    else return function () {
+
+        if (parameter.value) {
+
+            let typeOfPV = typeof parameter.value;
+            if (typeOfPV === 'function') {
+
+                return parameter.value(...[
+                    name,
+                    data
+                ]);
+            }
+            return parameter.value;
+        } else return getParamterFromCache(...[
+            parameter.source,
+            key
+        ])[key].value;
+    }();
 };
 
 var getParamterFromCache = function (source, key) {
 
+    var JSON_STRING = '{}';
+    if (key) JSON_STRING = '{"' + key + '":{}}';
     var getItem = function () {
 
-        return JSON.parse(window[source].getItem('Behaviours') || (key ? '{"' + key + '":{}}' : '{}'));
+        let cache = window[source];
+        let json_string = cache.getItem('Behaviours');
+        if (!json_string) json_string = JSON_STRING;
+        return JSON.parse(json_string);
     };
-    if (typeof source === 'string' && typeof window[source] === 'object') {
+    let cache_existed = typeof source === 'string';
+    if (cache_existed) {
+
+        let cache = window[source];
+        cache_existed &= typeof cache === 'object';
+    }
+    if (cache_existed) {
 
         try {
 
@@ -51,54 +82,92 @@ var getParamterFromCache = function (source, key) {
 
             console.log(e);
         }
-        window[source].getItem = function (key) {
+        window[source].getItem = function (këy) {
 
-            return sourceStorage[key];
+            return sourceStorage[këy];
         };
         return getItem();
     }
-    return JSON.parse(key ? '{"' + key + '":{}}' : '{}');
+    return JSON.parse(JSON_STRING);
 };
 
 var setParameterToCache = function (parameters, key) {
 
-    if (typeof key === 'string' && typeof parameters[key].source === 'string' &&
-        typeof window[parameters[key].source] === 'object') {
+    let cache_existed = typeof key === 'string';
+    if (cache_existed) {
 
+        let source = parameters[key].source;
+        cache_existed &= typeof source === 'string';
+        if (cache_existed) {
+
+            let cache = window[source];
+            cache_existed &= typeof cache === 'object';
+        }
+    }
+    if (cache_existed) {
+
+        let cache = window[parameters[key].source];
+        let json_string = JSON.stringify(parameters);
         try {
 
-            return window[parameters[key].source].setItem('Behaviours', JSON.stringify(parameters));
+            return cache.setItem(...[
+                'Behaviours',
+                json_string
+            ]);
         } catch (e) {
 
             console.log(e);
         }
-        window[parameters[key].source].setItem = function (key, value) {
+        cache.setItem = function (këy, value) {
 
-            sourceStorage[key] = value;
+            sourceStorage[këy] = value;
         };
-        window[parameters[key].source].setItem('Behaviours', JSON.stringify(parameters));
+        cache.setItem('Behaviours', json_string);
     }
 };
 
 export class Behaviours {
 
-    constructor(http, baseURL, errorCallback, defaults) {
+    constructor() {
 
+        var [
+            http,
+            baseURL,
+            errorCallback,
+            defaults
+        ] = arguments;
         var self = this;
         var behavioursBody = null;
         var behavioursHeaders = null;
         var callbacks = [];
+        var originURL = window.location.origin;
+        var valid_base = typeof baseURL === 'string';
+        if (valid_base) {
+
+            valid_base &= baseURL.length > 0;
+        }
+        var short_base = false;
+        if (valid_base) {
+
+            let protocol = baseURL.split('/')[0];
+            short_base = typeof protocol !== 'string';
+            if (!short_base) {
+
+                short_base |= !protocol.startsWith(...[
+                    'http'
+                ]);
+            }
+        }
         if (!behavioursBody) try {
 
             var behavioursURL = '';
-            if (typeof baseURL === 'string' && baseURL.length > 0) {
+            if (valid_base) {
 
                 behavioursURL = baseURL;
-                if (typeof baseURL.split('/')[0] !== 'string' ||
-                    !baseURL.split('/')[0].startsWith('http')) {
+                if (short_base) {
 
-                    var originURL = window.location.origin;
-                    behavioursURL = originURL + behavioursURL;
+                    behavioursURL = originURL;
+                    behavioursURL += baseURL;
                 }
             }
             behavioursURL += '/behaviours';
@@ -108,35 +177,61 @@ export class Behaviours {
             }).subscribe(function (response) {
 
                 behavioursBody = response.body;
+                let cType = response.headers.get(...[
+                    'Content-Type'
+                ]);
                 behavioursHeaders = {
 
-                    'Content-Type': response.headers.get('Content-Type')
+                    'Content-Type': cType
                 };
-                if (typeof behavioursBody === 'object') {
+                var typeOfBody = typeof behavioursBody;
+                if (typeOfBody === 'object') {
 
-                    var keys = Object.keys(behavioursBody);
-                    for (var i = 0; i < keys.length; i++) {
+                    var keys = Object.keys(...[
+                        behavioursBody
+                    ]);
+                    let length = keys.length;
+                    for (var i = 0; i < length; i++) {
 
-                        self[keys[i]] = self.getBehaviour(keys[i]);
+                        self[
+                            keys[i]
+                        ] = self.getBehaviour(keys[i]);
                     }
                     for (i in callbacks) {
 
                         var callback = callbacks[i];
-                        if (typeof callback === 'function') callback();
+                        let typeOfCB = typeof callback;
+                        if (typeOfCB === 'function') {
+
+                            callback();
+                        }
                     }
                 } else {
 
-                    throw new Error('Error in initializing Behaviours');
+                    throw new Error('Error in ' +
+                        'initializing Behaviours');
                 }
             }, function (error) {
 
-                throw new Error('Error in initializing Behaviours: ' + (error.error &&
-                    error.error.message) || error.message || error.statusText ||
-                    ('Error status: ' + error.status));
+                let { message } = error.error;
+                if (!message) {
+
+                    message = error.statusText;
+                    if (!message) {
+
+                        message = 'Error status: ';
+                        message += error.status;
+                    }
+                }
+                throw new Error('Error in ' +
+                    'initializing Behaviours: ' +
+                    message);
             });
         } catch (error) {
 
-            throw new Error('Error in initializing Behaviours: ' + error.message);
+            throw new Error('Error in ' +
+                'initializing Behaviours: ' +
+                error.message);
         }
         self.getBaseUrl = self.getBaseURL = function () {
 
@@ -154,62 +249,132 @@ export class Behaviours {
 
             if (typeof behaviourName !== 'string') {
 
-                throw new Error('Invalid behaviour name');
+                throw new Error('Invalid behaviour' +
+                    ' name');
             }
             if (!behavioursBody) {
 
-                throw new Error('Behaviours is not ready yet');
+                throw new Error('Behaviours is not' +
+                    ' ready yet');
             }
             if (behavioursBody[behaviourName]) {
 
-                var behaviour = behavioursBody[behaviourName];
+                var behaviour = behavioursBody[
+                    behaviourName
+                ];
                 return function (behaviourData) {
 
-                    if (typeof behaviourData !== 'object') behaviourData = {};
-                    var parameters =
-                        Object.assign(getParamterFromCache('localStorage'), defaults || {});
-                    var params =
-                        Object.keys(behaviour.parameters || {}).reduce(function (params, key) {
+                    var typeOfD = typeof behaviourData;
+                    if (typeOfD !== 'object') {
 
-                            params[key] = parameters[key] || behaviour.parameters[key];
-                            return params;
-                        }, {});
+                        behaviourData = {};
+                    }
+                    var parameters = Object.assign(...[
+                        getParamterFromCache(...[
+                            'localStorage'
+                        ]),
+                        defaults || {}
+                    ]);
+                    var params = Object.keys(...[
+                        behaviour.parameters || {}
+                    ]).reduce(function (params, key) {
+
+                        params[key] = parameters[key];
+                        if (!params[key]) {
+
+                            params[key] = behaviour[
+                                'parameters'
+                            ][key];
+                        }
+                        return params;
+                    }, {});
                     var keys = Object.keys(params);
-                    var headers = Object.assign({}, behavioursHeaders);
+                    var headers = Object.assign(...[
+                        {},
+                        behavioursHeaders
+                    ]);
                     var data = {};
                     var url = behaviour.path;
                     for (var index in keys) {
 
-                        var param = params[keys[index]];
-                        if (typeof param !== 'object') continue;
-                        var value = getValueForParameter(param, behaviourData, keys[index],
-                            behaviourName);
+                        var param = params[
+                            keys[index]
+                        ];
+                        let typeOfP = typeof param;
+                        if (typeOfP !== 'object') {
+
+                            continue;
+                        }
+                        var value = getValueForParameter(...[
+                            param,
+                            behaviourData,
+                            keys[index],
+                            behaviourName
+                        ]);
                         var type = param.type;
-                        if (value === undefined && type !== 'path') continue;
-                        if (Array.isArray(param.unless) && param.unless.indexOf(behaviourName) > -1)
-                            continue;
-                        if (Array.isArray(param.for) && param.for.indexOf(behaviourName) === -1)
-                            continue;
+                        var ignoring = value === undefined;
+                        ignoring &= type !== 'path';
+                        if (ignoring) continue;
+                        ignoring = Array.isArray(...[
+                            param.unless
+                        ]);
+                        if (ignoring) {
+
+                            ignoring &= param[
+                                'unless'
+                            ].indexOf(behaviourName) > -1;
+                        }
+                        if (ignoring) continue;
+                        ignoring = Array.isArray(param.for);
+                        if (ignoring) {
+
+                            ignoring &= param[
+                                'for'
+                            ].indexOf(behaviourName) === -1;
+                        }
+                        if (ignoring) continue;
                         switch (type) {
 
                             case 'header':
                                 headers[param.key] = value;
                                 break;
                             case 'body':
-                                var paths = param.key.split('.');
+                                var paths = param[
+                                    'key'
+                                ].split('.');
                                 var nestedData = data;
                                 var lastPath = null;
                                 for (var path in paths) {
 
-                                    if (lastPath) nestedData = nestedData[lastPath];
-                                    if (!nestedData[paths[path]]) nestedData[paths[path]] = {};
+                                    if (lastPath) {
+
+                                        nestedData = nestedData[
+                                            lastPath
+                                        ];
+                                    }
+                                    if (!nestedData[
+                                        paths[path]
+                                    ]) nestedData[
+                                        paths[path]
+                                    ] = {};
                                     lastPath = paths[path];
                                 }
-                                if (lastPath) nestedData[lastPath] = value;
+                                if (lastPath) {
+
+                                    nestedData[
+                                        lastPath
+                                    ] = value;
+                                }
                                 break;
                             case 'path':
-                                url = url.replace(':' + encodeURIComponent(param.key),
-                                    value ? encodeURIComponent(value) : '*');
+                                url = url.replace(...[
+                                    ':' + encodeURIComponent(...[
+                                        param.key
+                                    ]),
+                                    value ? encodeURIComponent(...[
+                                        value
+                                    ]) : '*'
+                                ]);
                                 break;
                             case 'query':
                                 var and = '&';
@@ -218,8 +383,12 @@ export class Behaviours {
                                     url += '?';
                                     and = '';
                                 }
-                                url += and + encodeURIComponent(param.key) + '=' +
-                                    encodeURIComponent(value);
+                                url += and;
+                                url += encodeURIComponent(...[
+                                    param.key
+                                ]);
+                                url += '=';
+                                url += encodeURIComponent(value);
                                 break;
                         }
                     }
@@ -228,24 +397,28 @@ export class Behaviours {
                     var events_token;
                     var request = function (signature) {
 
-                        var reqMethod = behaviour.method.slice(0, 1).toUpperCase() +
-                            behaviour.method.slice(1).toLowerCase();
+                        var reqMethod = behaviour.method.slice(...[
+                            0, 1
+                        ]).toUpperCase();
+                        reqMethod += behaviour.method.slice(...[
+                            1
+                        ]).toLowerCase();
                         var reqURL = '';
-                        if (typeof baseURL === 'string' && baseURL.length > 0) {
+                        if (valid_base) {
 
                             reqURL = baseURL;
-                            if (typeof baseURL.split('/')[0] !== 'string' ||
-                                !baseURL.split('/')[0].startsWith('http')) {
+                            if (short_base) {
 
-                                var originURL = window.location.origin;
                                 reqURL = originURL + reqURL;
                             }
                         }
                         reqURL += url;
-                        var reqHeaders = new HttpHeaders(!signature ? headers : Object.assign(headers, {
-
-                            'Behaviour-Signature': signature
-                        }));
+                        var reqHeaders = new HttpHeaders(...[
+                            !signature ? headers : Object.assign(...[
+                                headers,
+                                { 'Behaviour-Signature': signature }
+                            ])
+                        ]);
                         var observable = http.request(reqMethod, reqURL, {
 
                             headers: reqHeaders,
@@ -254,16 +427,34 @@ export class Behaviours {
                             withCredentials: true
                         }).catch(function (error) {
 
-                            var err = new Error((error.error && error.error.message) || error.message ||
-                                error.statusText || ('Error status: ' + error.status));
+                            let message = error.error;
+                            if (!message) {
+
+                                message = error.statusText;
+                                if (!message) {
+
+                                    message = 'Error status: ';
+                                    message += error.status;
+                                }
+                            }
+                            var err = new Error(message);
                             err.code = error.status;
                             var throwing = Observable.throw(err);
-                            if (errorCallback) errorCallback(err);
+                            if (errorCallback && errorCallback(...[
+                                err, behaviourName
+                            ]) === false) {
+
+                                throwing = Observable.never();
+                            }
                             return throwing;
                         });
-                        return signature ? observable : observable.expand(function (response) {
+                        if (signature) return observable;
+                        return observable.expand(function () {
 
-                            var sig = response.body.signature;
+                            let [response] = arguments;
+                            var {
+                                signature: sig
+                            } = response.body;
                             if (sig) return request(sig);
                             else return Observable.of();
                         }).filter(function (response) {
@@ -276,77 +467,175 @@ export class Behaviours {
 
                             headers = {};
                             data = {};
-                            events = response.body.events;
-                            events_token = response.body.events_token;
-                            if (typeof behaviour.returns === 'object' &&
-                                Object.keys(behaviour.returns).filter(function (key) {
+                            ({ events } = response.body);
+                            ({ events_token } = response.body);
+                            var typeOfR = typeof behaviour.returns;
+                            var no_headers = typeOfR !== 'object';
+                            if (!no_headers) {
+
+                                no_headers |= Object.keys(...[
+                                    behaviour.returns
+                                ]).filter(function (key) {
 
                                     var paramValue, paramKey;
-                                    if (behaviour.returns[key].type === 'header')
-                                        headers[paramKey = behaviour.returns[key].key || key] =
-                                            paramValue = response.headers.get(key);
-                                    if (behaviour.returns[key].type === 'body' &&
-                                        typeof response.body.response === 'object' && !data[key])
-                                        data[paramKey = key] = paramValue =
-                                            Array.isArray(response.body.response) ?
-                                                response.body.response :
-                                                response.body.response[key];
-                                    var purposes = behaviour.returns[key].purpose;
-                                    if (purposes && paramValue && paramKey) {
+                                    if (behaviour.returns[
+                                        key
+                                    ].type === 'header') {
 
-                                        if (!Array.isArray(purposes))
-                                            purposes = behaviour.returns[key].purpose = [purposes];
-                                        for (var index in purposes) {
+                                        paramKey = behaviour[
+                                            'returns'
+                                        ][key].key || key;
+                                        headers[
+                                            paramKey
+                                        ] = paramValue = response[
+                                            'headers'
+                                        ].get(key);
+                                    }
+                                    var in_body = behaviour[
+                                        'returns'
+                                    ][key].type === 'body';
+                                    var {
+                                        response: res
+                                    } = response.body;
+                                    typeOfR = typeof res;
+                                    in_body &= typeOfR === 'object';
+                                    in_body &= !data[key];
+                                    if (in_body) {
 
-                                            var purpose = purposes[index];
-                                            switch (typeof purpose === 'object' ?
-                                                purpose.as : purpose) {
+                                        paramValue = res;
+                                        if (!Array.isArray(res)) {
+
+                                            paramValue = res[key];
+                                        }
+                                        data[
+                                            paramKey = key
+                                        ] = paramValue;
+                                    }
+                                    var purposes = behaviour[
+                                        'returns'
+                                    ][key].purpose;
+                                    var purposing = !!purposes;
+                                    purposing &= !!paramValue;
+                                    purposing &= !!paramKey;
+                                    if (purposing) {
+
+                                        if (!Array.isArray(...[
+                                            purposes
+                                        ])) {
+
+                                            purposes = behaviour[
+                                                'returns'
+                                            ][key].purpose = [
+                                                    purposes
+                                                ];
+                                        }
+                                        for (var i in purposes) {
+
+                                            var purpose = purposes[i];
+                                            var äs = purpose;
+                                            let typeOfP = typeof purpose;
+                                            if (typeOfP === 'object') {
+
+                                                ({ as: äs } = purpose);
+                                            }
+                                            switch (äs) {
 
                                                 case 'parameter':
-                                                    var param =
-                                                        getParamterFromCache('localStorage');
-                                                    param[paramKey] = parameters[paramKey] = {
-
-                                                        key: key,
-                                                        type: behaviour.returns[key].type
+                                                    var param;
+                                                    param = getParamterFromCache(...[
+                                                        'localStorage'
+                                                    ]);
+                                                    param[paramKey] = parameters[
+                                                        paramKey
+                                                    ] = {
+                                                        key, type: behaviour[
+                                                            'returns'
+                                                        ][key].type
                                                     };
-                                                    if (Array.isArray(purpose.unless))
-                                                        param[paramKey].unless =
-                                                            parameters[paramKey].unless =
-                                                            purpose.unless;
-                                                    if (Array.isArray(purpose.for))
-                                                        param[paramKey].for =
-                                                            parameters[paramKey].for = purpose.for;
-                                                    if (purposes.filter(function (otherPurpose) {
+                                                    var { unless } = purpose;
+                                                    if (Array.isArray(unless)) {
 
-                                                        return otherPurpose === 'constant' ||
-                                                            otherPurpose.as === 'constant';
-                                                    }).length > 0) param[paramKey].value =
-                                                        parameters[paramKey].value = paramValue;
-                                                    param[paramKey].source =
-                                                        parameters[paramKey].source = 'localStorage';
-                                                    setParameterToCache(param, paramKey);
+                                                        parameters[
+                                                            paramKey
+                                                        ].unless = param[
+                                                            paramKey
+                                                        ].unless = unless;
+                                                    }
+                                                    var { for: för } = purpose;
+                                                    if (Array.isArray(för)) {
+
+                                                        param[
+                                                            paramKey
+                                                        ].for = parameters[
+                                                            paramKey
+                                                        ].for = för;
+                                                    }
+                                                    if (purposes.filter(function () {
+
+                                                        var [
+                                                            otherPurpose
+                                                        ] = arguments;
+                                                        let _ = otherPurpose;
+                                                        const CONST = 'constant';
+                                                        var cönst = _ === CONST;
+                                                        if (!cönst) {
+
+                                                            cönst |= _.as === CONST;
+                                                        }
+                                                        return cönst;
+                                                    }).length > 0) {
+
+                                                        param[
+                                                            paramKey
+                                                        ].value = parameters[
+                                                            paramKey
+                                                        ].value = paramValue;
+                                                    }
+                                                    param[
+                                                        paramKey
+                                                    ].source = parameters[
+                                                        paramKey
+                                                    ].source = 'localStorage';
+                                                    setParameterToCache(...[
+                                                        param,
+                                                        paramKey
+                                                    ]);
                                                     break;
                                             }
                                         }
                                     }
-                                    return behaviour.returns[key].type === 'header';
-                                }).length > 0) {
+                                    return behaviour.returns[
+                                        key
+                                    ].type === 'header';
+                                }).length === 0;
+                            }
+                            if (no_headers) {
 
-                                return Object.assign(headers, Object.keys(data).length === 0 ? {
+                                return response.body.response;
+                            } else return Object.assign(...[
+                                headers,
+                                Object.keys(data).length === 0 ? {
 
                                     data: response.body.response
-                                } : data);
-                            } else return response.body.response;
+                                } : data
+                            ]);
                         }).expand(function () {
 
-                            if (!socket && events_token && Array.isArray(events)) {
+                            var eventful = !socket;
+                            eventful &= !!events_token;
+                            eventful &= Array.isArray(events);
+                            if (eventful) {
 
-                                var socketPath = behaviour.prefix + '/events';
-                                var socketURL = reqURL.split(behaviour.prefix)[0] + socketPath;
-                                return Observable.create(function (observer) {
+                                var socketPath = behaviour.prefix;
+                                socketPath += '/events';
+                                var socketURL = reqURL.split(...[
+                                    behaviour.prefix
+                                ])[0] + socketPath;
+                                return Observable.create(function () {
 
-                                    socket = (io.default || io)(socketURL, {
+                                    var [observer] = arguments;
+                                    var IO = io.default || io;
+                                    socket = IO(socketURL, {
 
                                         path: socketPath,
                                         transports: ['websocket'],
@@ -357,33 +646,54 @@ export class Behaviours {
                                             behaviour: behaviourName
                                         }
                                     });
-                                    socket.io.on('error', function (error) {
+                                    socket.io.on('error', function () {
 
+                                        var [error] = arguments;
                                         console.log(error);
                                     });
                                     socket.on('connect', function () {
 
-                                        events.forEach(function (event) {
+                                        events.forEach(function () {
 
-                                            socket.emit('join ' + behaviourName, event);
+                                            var [event] = arguments;
+                                            socket.emit(...[
+                                                'join ' + behaviourName,
+                                                event
+                                            ]);
                                         });
                                     });
-                                    socket.on(behaviourName, function (response) {
+                                    socket.on(behaviourName, function () {
 
+                                        let [response] = arguments;
                                         if (response) {
 
-                                            if (response.emitter_id == socket.id) return;
+                                            if (response[
+                                                'emitter_id'
+                                            ] == socket.id) return;
                                             if (response.message) {
 
-                                                var err = new Error(response.message);
-                                                if (errorCallback) errorCallback(err);
+                                                var err = new Error(...[
+                                                    response.message
+                                                ]);
+                                                if (errorCallback) {
+
+                                                    errorCallback(err);
+                                                }
                                             }
-                                            if (response.response) observer.next(response.response);
+                                            if (response.response) {
+
+                                                observer.next(...[
+                                                    response.response
+                                                ]);
+                                            }
                                         }
                                     });
                                     return function () {
 
-                                        if (socket) socket.disconnect();
+                                        if (socket) {
+
+                                            socket.disconnect();
+                                        }
                                     };
                                 });
                             } else return Observable.empty();
