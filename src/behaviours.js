@@ -427,7 +427,7 @@ export class Behaviours {
                             withCredentials: true
                         }).catch(function (error) {
 
-                            let message = error.error;
+                            let { message } = error.error;
                             if (!message) {
 
                                 message = error.statusText;
