@@ -264,6 +264,10 @@ export class Behaviours {
                 ];
                 return function (behaviourData) {
 
+                    if (behaviourName === 'behaviours') {
+
+                        return Observable.of(behavioursBody);
+                    }
                     var typeOfD = typeof behaviourData;
                     if (typeOfD !== 'object') {
 
